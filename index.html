@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      margin: 0;
+    }
+    .checkbox-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+    }
+  </style>
+  <title>Sports Fields Warsaw</title>
+  <link rel="icon" type="image/ico" href="Przechwytywanie.ico" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="leaflet.awesome-markers.css">
+  <meta charset="UTF-8" />
+</head>
+<body>
+<div id="map"></div>
+<div class="checkbox-container">
+  <label><input type="checkbox" id="basketballCheckbox" checked> Basketball</label><br>
+  <label><input type="checkbox" id="volleyballCheckbox" checked> Volleyball</label><br>
+  <label><input type="checkbox" id="tennisCheckbox" checked> Tennis</label><br>
+  <label><input type="checkbox" id="soccerCheckbox" checked> Soccer</label><br>
+  <label><input type="checkbox" id="handballCheckbox" checked> Handball</label><br>
+</div>
+<div style="position: absolute; bottom: 10px; left: 10px; z-index: 1000;">
+  <button id="switchMapButton" style="padding: 10px; background-color: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer;">
+    Switch to WMS Orto
+  </button>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="leaflet.awesome-markers.js"></script>
+<script>
+  var mymap = L.map('map', { maxZoom: 40 }).setView([52.23190, 21.00601], 13);
+
+  // OpenStreetMap tile layer
+  var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(mymap);
+
+  // WMS Orto tile layer
+ var esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+});
+
+
+  // Button to switch layers
+  document.getElementById("switchMapButton").addEventListener("click", function () {
+    if (mymap.hasLayer(osm)) {
+      mymap.removeLayer(osm);
+      esriWorldImagery.addTo(mymap);
+      this.innerText = "Switch to OpenStreetMap";
+    } else {
+      mymap.removeLayer(esriWorldImagery);
+      osm.addTo(mymap);
+      this.innerText = "Switch to ESRI World Imagery";
+    }
+  });
+
+  // Checkbox layer controls
+  var layers = {
+    basketball: L.layerGroup().addTo(mymap),
+    volleyball: L.layerGroup().addTo(mymap),
+    tennis: L.layerGroup().addTo(mymap),
+    soccer: L.layerGroup().addTo(mymap),
+    handball: L.layerGroup().addTo(mymap),
+    table_tennis: L.layerGroup().addTo(mymap)
+  };
+  function addMarkersToMap(geojsonData) {
+    geojsonData.features.forEach(feature => {
+        const sport = feature.properties.sport;
+        const surface = feature.properties.surface;
+        const latlng = L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]);
+        let markerColor = 'gray';
+        let markerIcon = 'dot-circle'; // Default icon
+        let layerGroup;
+
+        // Determine marker color based on surface type
+        switch (surface) {
+            case 'grass': markerColor = 'green'; break;
+            case 'ground': markerColor = 'green'; break;
+            case 'artificial_turf': markerColor = 'green'; break;
+            case 'natural': markerColor = 'green'; break;
+            case 'clay': markerColor = 'blue'; break;
+            case 'rubber': markerColor = 'blue'; break;
+            case 'concrete': markerColor = 'gray'; break;
+            case 'asphalt': markerColor = 'gray'; break;
+            case 'paving_stones': markerColor = 'gray'; break;
+            case 'sand': markerColor = 'yellow'; break;
+            case 'tartan': markerColor = 'darkred'; break;
+            case 'wood': markerColor = 'brown'; break;
+            default: markerColor = 'green'; // Unknown surface
+        }
+
+        // Determine marker icon based on sport type
+        switch (sport) {
+            case 'basketball': markerIcon = 'basketball-ball'; layerGroup = layers.basketball; break;
+            case 'volleyball': markerIcon = 'volleyball-ball'; layerGroup = layers.volleyball; break;
+            case 'tennis': markerIcon = 'baseball'; layerGroup = layers.tennis; break;
+			case 'table_tennis': markerIcon = 'table-tennis-paddle-ball'; layerGroup = layers.tennis; break;
+            case 'soccer': markerIcon = 'futbol'; layerGroup = layers.soccer; break;
+            case 'handball': markerIcon = 'hand-rock'; layerGroup = layers.handball; break;
+            default: return; // Skip unknown sports
+        }
+
+        const marker = L.marker(latlng, {
+            icon: L.AwesomeMarkers.icon({
+                icon: markerIcon,
+                markerColor: markerColor,
+                prefix: 'fa'
+            })
+        }).bindPopup(
+				`<b>ID:</b> ${feature.properties.id}<br>
+				 <a href="https://www.google.com/maps?q=${latlng.lat},${latlng.lng}" target="_blank" style="color:blue; text-decoration:underline;">
+				   Open in Google Maps
+				 </a>`
+);
+
+        // Add hover popup for surface, sport, and coordinates
+        marker.on('mouseover', function (e) {
+            const hoverPopup = L.popup({
+                closeButton: false,
+                offset: L.point(0, -20)
+            })
+                .setLatLng(latlng)
+                .setContent(
+                    `<b>Sport:</b> ${sport}<br>
+                     <b>Surface:</b> ${surface}<br>
+                     <b>Coordinates:</b> ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
+                )
+                .openOn(mymap);
+
+            marker.on('mouseout', function () {
+                mymap.closePopup(hoverPopup);
+            });
+        });
+
+        if (layerGroup) {
+            layerGroup.addLayer(marker);
+        }
+    });
+}
+
+
+  document.getElementById('basketballCheckbox').addEventListener('change', function () {
+    this.checked ? layers.basketball.addTo(mymap) : mymap.removeLayer(layers.basketball);
+  });
+
+  document.getElementById('volleyballCheckbox').addEventListener('change', function () {
+    this.checked ? layers.volleyball.addTo(mymap) : mymap.removeLayer(layers.volleyball);
+  });
+
+  document.getElementById('tennisCheckbox').addEventListener('change', function () {
+    this.checked ? layers.tennis.addTo(mymap) : mymap.removeLayer(layers.tennis);
+  });
+
+  document.getElementById('soccerCheckbox').addEventListener('change', function () {
+    this.checked ? layers.soccer.addTo(mymap) : mymap.removeLayer(layers.soccer);
+  });
+
+  document.getElementById('handballCheckbox').addEventListener('change', function () {
+    this.checked ? layers.handball.addTo(mymap) : mymap.removeLayer(layers.handball);
+  });
+
+  function fetchSportsFields() {
+    const overpassUrl = `https://overpass-api.de/api/interpreter?data=%2F*%0AThis%20has%20been%20generated%20by%20the%20overpass-turbo%20wizard.%0AThe%20original%20search%20was%3A%0A“"Boisko%20do%20koszykówki"%20or%20"boisko%20do%20siatkówki"”%0A*%2F%0A%5Bout%3Ajson%5D%5Btimeout%3A25%5D%3B%0A%2F%2F%20gather%20results%0A%28%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"basketball"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"handball"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"table_tennis"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"volleyball"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"skateboard"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"beachvolleyball"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"football"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"tennis"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%20%20nwr%5B"leisure"%3D"pitch"%5D%5B"sport"%3D"soccer"%5D%2852.15561021529722%2C20.833584130083654%2C52.34855346161024%2C21.187893212114904%29%3B%0A%29%3B%0A%2F%2F%20print%20results%0Aout%20center%3B`;
+
+    fetch(overpassUrl)
+      .then(response => response.json())
+      .then(data => {
+        const geojsonData = {
+          type: "FeatureCollection",
+          features: data.elements.map(element => {
+            const lat = element.center ? element.center.lat : element.lat;
+            const lon = element.center ? element.center.lon : element.lon;
+            return {
+              type: "Feature",
+              properties: {
+                id: element.id,
+                name: element.tags["name"] || "Unknown",
+                sport: element.tags["sport"] || "unknown",
+                surface: element.tags["surface"] || "unknown"
+              },
+              geometry: {
+                type: "Point",
+                coordinates: [lon, lat]
+              }
+            };
+          })
+        };
+
+        addMarkersToMap(geojsonData);
+      })
+      .catch(error => console.error("Error fetching sports fields data:", error));
+  }
+  fetchSportsFields();
+
+  mymap.attributionControl.setPrefix(
+    '<a href="http://leafletjs.com">Leaflet</a> |<a href="https://github.com/wavyboyasf">Bartosz Ziolkowski</a> Map of sports fields in Warsaw '
+  );
+</script>
+</body>
+</html>
